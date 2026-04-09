@@ -14,7 +14,18 @@ const firebaseConfig = {
   firestoreDatabaseId: "ai-studio-dff8f95f-cfc8-47bf-b9d9-c2135008111d"
 };
 
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "TODO_KEYHERE") {
+    console.warn("Firebase API Key is missing or invalid. Please check your configuration.");
+  }
+  app = initializeApp(firebaseConfig);
+} catch (error) {
+  console.error("Firebase initialization failed:", error);
+  // Fallback to avoid crashing the whole app
+  app = { name: '[DEFAULT]' } as any; 
+}
+
 console.log("Firebase initialized with project:", firebaseConfig.projectId);
 console.log("Config used:", {
   authDomain: firebaseConfig.authDomain,

@@ -474,8 +474,8 @@ export const StrategicReport = ({ transactions, products = [], people = [], onBa
           <BarChart3 className="w-5 h-5 text-blue-500" />
           Desempenho Mensal (Receitas vs Despesas)
         </h3>
-        <div className="h-80 w-full min-h-[320px]">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <div className="h-[400px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={reportData.lastMonths}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis 
