@@ -1,0 +1,110 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user account information and business details.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "plan": { "type": "string", "enum": ["gratuito", "pro", "elite"] },
+        "role": { "type": "string", "enum": ["admin", "gerente", "funcionario"] },
+        "hasSelectedPlan": { "type": "boolean" },
+        "nomeEmpresa": { "type": "string" },
+        "nomeResponsavel": { "type": "string" },
+        "cnpjEmpresa": { "type": "string" },
+        "descricaoEmpresa": { "type": "string" },
+        "nicho": { "type": "string" },
+        "telefone": { "type": "string" },
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "aprendizado": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "palavra": { "type": "string" },
+              "categoria": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["uid", "email", "plan"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial records of income and expenses.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "item": { "type": "string" },
+        "valor": { "type": "number" },
+        "tipo": { "type": "string", "enum": ["despesa", "receita"] },
+        "categoria": { "type": "string" },
+        "data": { "type": "string", "format": "date-time" },
+        "originalMessage": { "type": "string" },
+        "personId": { "type": "string" },
+        "productId": { "type": "string" },
+        "quantidade": { "type": "number" },
+        "dataVencimento": { "type": "string" },
+        "status": { "type": "string", "enum": ["pago", "pendente", "atrasado"] },
+        "desconto": { "type": "number" },
+        "impostos": { "type": "number" }
+      },
+      "required": ["uid", "item", "valor", "tipo", "categoria", "data"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Inventory items.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "nome": { "type": "string" },
+        "preco": { "type": "number" },
+        "estoque": { "type": "number" },
+        "estoqueMinimo": { "type": "number" },
+        "categoria": { "type": "string" },
+        "localEstoque": { "type": "string" },
+        "fotoUrl": { "type": "string" },
+        "dataCadastro": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "nome", "preco", "estoque", "dataCadastro"]
+    },
+    "Person": {
+      "title": "Person",
+      "description": "Clients, suppliers, or employees.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "tipo": { "type": "string", "enum": ["cliente", "fornecedor", "funcionario"] },
+        "nome": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "telefone": { "type": "string" },
+        "documento": { "type": "string" },
+        "dataCadastro": { "type": "string", "format": "date-time" },
+        "role": { "type": "string", "enum": ["admin", "gerente", "funcionario"] },
+        "status": { "type": "string", "enum": ["ativo", "inativo"] }
+      },
+      "required": ["uid", "tipo", "nome", "dataCadastro"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Transaction records."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product inventory."
+    },
+    "/people/{personId}": {
+      "schema": "Person",
+      "description": "People (clients, suppliers, employees)."
+    }
+  }
+}
