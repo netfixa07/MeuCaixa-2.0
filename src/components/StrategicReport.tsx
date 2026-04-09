@@ -31,8 +31,8 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Legend
 } from 'recharts';
 import { Transaction, Product, Person } from '../types';
 import { cn } from '../lib/utils';
@@ -465,40 +465,6 @@ export const StrategicReport = ({ transactions, products = [], people = [], onBa
               {language === 'pt' ? 'R$' : '$'} {reportData.totalStockValue.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US', { minimumFractionDigits: 2 })}
             </span>
           </div>
-        </div>
-      </div>
-
-      {/* Performance Chart */}
-      <div className="bg-white dark:bg-black p-8 rounded-[40px] border border-blue-100 dark:border-slate-800 shadow-xl">
-        <h3 className="text-lg font-bold text-blue-900 dark:text-white mb-6 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-blue-500" />
-          Desempenho Mensal (Receitas vs Despesas)
-        </h3>
-        <div className="h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={reportData.lastMonths}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis 
-                dataKey="month" 
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 12, fill: '#64748b' }}
-              />
-              <YAxis 
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 12, fill: '#64748b' }}
-                tickFormatter={(value) => `${language === 'pt' ? 'R$' : '$'} ${value}`}
-              />
-              <Tooltip 
-                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                formatter={(value: number) => [`${language === 'pt' ? 'R$' : '$'} ${value.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')}`]}
-              />
-              <Legend iconType="circle" />
-              <Bar dataKey="receitas" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
         </div>
       </div>
 

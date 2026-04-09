@@ -1,10 +1,10 @@
 {
-  "projectId": "meucaixa-ef117",
-  "appId": "1:295022963319:web:3136aab64fd1da288e7472",
-  "apiKey": "AIzaSyCaw45EWsOPWFe3D9eNThakkeOfymYAyMo",
-  "authDomain": "meucaixa-ef117.firebaseapp.com",
+  "projectId": "gen-lang-client-0189336729",
+  "appId": "1:26588274688:web:2fcc0e32d32d1cbe72f8e5",
+  "apiKey": "AIzaSyDbmsFqifeznhaZZPhDP-qc0OIaywUPJbo",
+  "authDomain": "gen-lang-client-0189336729.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-dff8f95f-cfc8-47bf-b9d9-c2135008111d",
-  "storageBucket": "meucaixa-ef117.firebasestorage.app",
-  "messagingSenderId": "295022963319",
+  "storageBucket": "gen-lang-client-0189336729.firebasestorage.app",
+  "messagingSenderId": "26588274688",
   "measurementId": ""
 }

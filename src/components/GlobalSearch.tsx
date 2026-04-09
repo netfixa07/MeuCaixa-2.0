@@ -5,16 +5,15 @@ import { Transaction, Product, Person } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface GlobalSearchProps {
-  isOpen: boolean;
-  onClose: () => void;
   transactions: Transaction[];
   products: Product[];
   people: Person[];
   onNavigate: (tab: 'dashboard' | 'produtos' | 'pessoas' | 'estrategico') => void;
 }
 
-export const GlobalSearch = ({ isOpen, onClose, transactions, products, people, onNavigate }: GlobalSearchProps) => {
+export const GlobalSearch = ({ transactions, products, people, onNavigate }: GlobalSearchProps) => {
   const { t, language } = useLanguage();
+  const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -22,10 +21,7 @@ export const GlobalSearch = ({ isOpen, onClose, transactions, products, people, 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        // Handled by parent App.tsx
-      }
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
+        setIsOpen(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -43,14 +39,23 @@ export const GlobalSearch = ({ isOpen, onClose, transactions, products, people, 
   const filteredTransactions = transactions.filter(t => t.item.toLowerCase().includes(query.toLowerCase()));
 
   return (
-    <AnimatePresence>
-      {isOpen && (
+    <>
+      <button
+        onClick={() => setIsOpen(true)}
+        className="p-2.5 text-blue-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex items-center gap-2"
+      >
+        <Search className="w-5 h-5" />
+        <span className="hidden sm:inline text-sm font-medium">{t('search.button')}</span>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
           <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={onClose}
+              onClick={() => setIsOpen(false)}
               className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             />
             <motion.div
@@ -69,7 +74,7 @@ export const GlobalSearch = ({ isOpen, onClose, transactions, products, people, 
                   placeholder={t('search.placeholder')}
                   className="flex-1 bg-transparent border-none focus:ring-0 text-base md:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 px-4 py-2 outline-none"
                 />
-                <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <button onClick={() => setIsOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -83,7 +88,7 @@ export const GlobalSearch = ({ isOpen, onClose, transactions, products, people, 
                         {filteredProducts.map(p => (
                           <button
                             key={p.id}
-                            onClick={() => { onNavigate('produtos'); onClose(); }}
+                            onClick={() => { onNavigate('produtos'); setIsOpen(false); }}
                             className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-left"
                           >
                             <Package className="w-4 h-4 text-blue-500" />
@@ -104,7 +109,7 @@ export const GlobalSearch = ({ isOpen, onClose, transactions, products, people, 
                         {filteredPeople.map(p => (
                           <button
                             key={p.id}
-                            onClick={() => { onNavigate('pessoas'); onClose(); }}
+                            onClick={() => { onNavigate('pessoas'); setIsOpen(false); }}
                             className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-left"
                           >
                             <Users className="w-4 h-4 text-emerald-500" />
@@ -123,7 +128,7 @@ export const GlobalSearch = ({ isOpen, onClose, transactions, products, people, 
                         {filteredTransactions.map(t => (
                           <button
                             key={t.id}
-                            onClick={() => { onNavigate('dashboard'); onClose(); }}
+                            onClick={() => { onNavigate('dashboard'); setIsOpen(false); }}
                             className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-left"
                           >
                             <History className="w-4 h-4 text-amber-500" />
@@ -155,5 +160,6 @@ export const GlobalSearch = ({ isOpen, onClose, transactions, products, people, 
           </div>
         )}
       </AnimatePresence>
+    </>
   );
 };

@@ -33,8 +33,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   
   if (message.includes('não parece estar ativado')) {
     message = "O Firestore não parece estar ativado ou o projeto não foi configurado corretamente no Console do Firebase. Verifique se o banco de dados foi criado.";
-  } else if (message.toLowerCase().includes('permission-denied') || message.toLowerCase().includes('insufficient permissions')) {
-    message = `Permissão negada ao tentar ${operationType} em ${path}. Verifique as regras de segurança do Firestore.`;
   }
 
   const errInfo: FirestoreErrorInfo = {

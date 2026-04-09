@@ -5,23 +5,29 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged, 
+  User,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from 'firebase/auth';
+import { 
   collection, 
   query, 
   where, 
   orderBy, 
   onSnapshot, 
   addDoc, 
+  setDoc, 
   doc, 
+  getDoc,
   getDocFromServer,
-  setDoc,
   updateDoc
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db, googleProvider } from './firebase';
 import { getSupportResponse, parseFinancialMessage } from './services/geminiService';
 import { UserProfile, Transaction, Plan, Product, Person, ChatMessage } from './types';
-import { useAuth } from './hooks/useAuth';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
 import { 
   Plus, 
   LogOut, 
@@ -115,7 +121,11 @@ import { handleFirestoreError, OperationType } from './lib/firebase-utils';
 
 export default function App() {
   const { t, language } = useLanguage();
-  const { user, profile, loading: authLoading, isAuthReady, profileError, logout, updateProfile } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -130,6 +140,10 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'estrategico' | 'produtos' | 'vendas' | 'pessoas' | 'chat' | 'inteligencia'>('dashboard');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [showSetupHelper, setShowSetupHelper] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [isUpdatingAccount, setIsUpdatingAccount] = useState(false);
@@ -138,13 +152,28 @@ export default function App() {
   const [hasConfirmedPlan, setHasConfirmedPlan] = useState(false);
   const [notifiedLowStock, setNotifiedLowStock] = useState<Set<string>>(new Set());
   const [notifiedHighSales, setNotifiedHighSales] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Registration fields
+  const [regNomeEmpresa, setRegNomeEmpresa] = useState("");
+  const [regNomeResponsavel, setRegNomeResponsavel] = useState("");
+  const [regCnpjEmpresa, setRegCnpjEmpresa] = useState("");
+  const [regDescricaoEmpresa, setRegDescricaoEmpresa] = useState("");
+  const [regNicho, setRegNicho] = useState("");
+  const [regTelefone, setRegTelefone] = useState<string | undefined>("");
+
+  useEffect(() => {
+    setAuthError("");
+    setShowSetupHelper(false);
+  }, [authMode]);
 
   const handleUpdateProfile = async (data: Partial<UserProfile>) => {
+    if (!user || !profile) return;
     try {
-      await updateProfile(data);
+      const profileRef = doc(db, 'users', user.uid);
+      await updateDoc(profileRef, data);
+      setProfile({ ...profile, ...data });
     } catch (error) {
-      // Error already handled in AuthContext
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
       throw error;
     }
   };
@@ -196,14 +225,82 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setIsSearchOpen(true);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+      
+      try {
+        if (currentUser) {
+          const profileRef = doc(db, 'users', currentUser.uid);
+          let profileSnap;
+          try {
+            profileSnap = await getDoc(profileRef);
+          } catch (error) {
+            handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+            throw error;
+          }
+
+          if (profileSnap.exists()) {
+            const data = profileSnap.data() as UserProfile;
+            let currentPlan = data.plan;
+            let hasSelectedPlan = data.hasSelectedPlan ?? false;
+            
+            // Update last login
+            try {
+              await updateDoc(profileRef, { lastLogin: new Date().toISOString() });
+            } catch (error) {
+              handleFirestoreError(error, OperationType.UPDATE, `users/${currentUser.uid}`);
+            }
+            
+            // Auto-upgrade VIP email
+            const vipEmails = ['gamerbilly898@hmail.com', 'gamerbilly898@gmail.com', 'douglastaylorinvestimentos@gmail.com', 'netfixa07@gmail.com'];
+            const isVip = currentUser.email && vipEmails.includes(currentUser.email.toLowerCase());
+            if (isVip && currentPlan !== 'elite') {
+              currentPlan = 'elite';
+              hasSelectedPlan = true;
+              try {
+                await setDoc(profileRef, { plan: 'elite', hasSelectedPlan: true }, { merge: true });
+              } catch (error) {
+                handleFirestoreError(error, OperationType.UPDATE, `users/${currentUser.uid}`);
+              }
+            }
+
+            setProfile({
+              ...data,
+              plan: currentPlan,
+              hasSelectedPlan: hasSelectedPlan
+            });
+          } else {
+            const vipEmails = ['gamerbilly898@hmail.com', 'gamerbilly898@gmail.com', 'douglastaylorinvestimentos@gmail.com', 'netfixa07@gmail.com'];
+            const isVip = currentUser.email && vipEmails.includes(currentUser.email.toLowerCase());
+            const newProfile: Partial<UserProfile> = {
+              uid: currentUser.uid,
+              email: currentUser.email || "",
+              displayName: currentUser.displayName || "",
+              plan: isVip ? 'elite' : 'gratuito',
+              hasSelectedPlan: isVip,
+              aprendizado: [],
+              createdAt: new Date().toISOString(),
+              lastLogin: new Date().toISOString()
+            };
+            try {
+              await setDoc(profileRef, newProfile, { merge: true });
+            } catch (error) {
+              handleFirestoreError(error, OperationType.CREATE, `users/${currentUser.uid}`);
+            }
+            setProfile(newProfile as UserProfile);
+          }
+        } else {
+          setProfile(null);
+          setProfileError(null);
+        }
+      } catch (error: any) {
+        setProfileError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setLoading(false);
       }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -266,13 +363,87 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transactions]);
 
+  const handleGoogleLogin = useCallback(async () => {
+    try {
+      setAuthError("");
+      setShowSetupHelper(false);
+      await signInWithPopup(auth, googleProvider);
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      if (error.code === 'auth/operation-not-allowed') {
+        setAuthError("O login com Google não está ativado no Console do Firebase.");
+        setShowSetupHelper(true);
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        setAuthError(""); // User closed popup, no need for error message
+      } else {
+        setAuthError("Falha ao entrar com Google.");
+      }
+    }
+  }, []);
+
+  const handleEmailAuth = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    setShowSetupHelper(false);
+    if (!email || !password) return;
+
+    try {
+      if (authMode === 'login') {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const newUser = userCredential.user;
+        
+        // Create profile with additional fields
+        const vipEmails = ['gamerbilly898@hmail.com', 'gamerbilly898@gmail.com', 'douglastaylorinvestimentos@gmail.com', 'netfixa07@gmail.com'];
+        const isVip = newUser.email && vipEmails.includes(newUser.email.toLowerCase());
+          const profileRef = doc(db, 'users', newUser.uid);
+          const now = new Date().toISOString();
+          const newProfile: UserProfile = {
+            uid: newUser.uid,
+            email: newUser.email || "",
+            displayName: newUser.displayName || "",
+            plan: isVip ? 'elite' : 'gratuito',
+            hasSelectedPlan: isVip,
+            nomeEmpresa: regNomeEmpresa,
+            nomeResponsavel: regNomeResponsavel,
+            cnpjEmpresa: regCnpjEmpresa,
+            descricaoEmpresa: regDescricaoEmpresa,
+            nicho: regNicho,
+            telefone: regTelefone || "",
+            aprendizado: [],
+            createdAt: now,
+            lastLogin: now
+          };
+        await setDoc(profileRef, newProfile);
+        setProfile(newProfile);
+      }
+    } catch (error: any) {
+      console.error("Auth failed:", error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setAuthError(t('auth.error_invalid'));
+      } else if (error.code === 'auth/email-already-in-use') {
+        setAuthError(t('auth.error_email_in_use'));
+      } else if (error.code === 'auth/weak-password') {
+        setAuthError(t('auth.error_weak_password'));
+      } else if (error.code === 'auth/operation-not-allowed') {
+        setAuthError(t('auth.error_not_allowed'));
+        setShowSetupHelper(true);
+      } else if (error.code === 'permission-denied') {
+        handleFirestoreError(error, OperationType.CREATE, 'users');
+      } else {
+        setAuthError(error.message || "Ocorreu um erro na autenticação.");
+      }
+    }
+  }, [authMode, email, password, regNomeEmpresa, regNomeResponsavel, regCnpjEmpresa, regDescricaoEmpresa, regTelefone]);
+
   const handleLogout = useCallback(async () => {
     try {
-      await logout();
+      await signOut(auth);
     } catch (error) {
       console.error("Logout failed:", error);
     }
-  }, [logout]);
+  }, []);
 
   useEffect(() => {
     if (!profile || !user) return;
@@ -406,15 +577,11 @@ export default function App() {
       setChatMessages(prev => [...prev, assistantMsg]);
     } catch (error) {
       console.error("Chat error:", error);
-      if (error instanceof Error && error.message.includes('permission-denied')) {
-        handleFirestoreError(error, OperationType.WRITE, 'transactions');
-      } else {
-        setChatError("Erro ao processar sua mensagem. Tente novamente.");
-      }
+      setChatError("Erro ao processar sua mensagem. Tente novamente.");
     } finally {
       setIsProcessing(false);
     }
-  }, [message, profile, user, isProcessing, products, people, t]);
+  }, [message, profile, user, isProcessing, products, people]);
 
   const handleMarkAsPaid = useCallback(async (id: string) => {
     try {
@@ -446,7 +613,7 @@ export default function App() {
       const profileRef = doc(db, 'users', user.uid);
       const updatedProfile = { ...profile, plan: newPlan, hasSelectedPlan: true };
       await setDoc(profileRef, updatedProfile, { merge: true });
-      await updateProfile(updatedProfile);
+      setProfile(updatedProfile);
       setHasConfirmedPlan(true);
       setMessage(`Plano atualizado para ${newPlan.toUpperCase()}!`);
     } catch (error) {
@@ -478,7 +645,7 @@ export default function App() {
     });
   }, [transactions, txFilter]);
 
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black transition-colors duration-300">
         <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
@@ -490,10 +657,197 @@ export default function App() {
     if (!hasSeenOnboarding) {
       return <Onboarding onComplete={completeOnboarding} />;
     }
-    return authMode === 'login' ? (
-      <Login onSwitchToRegister={() => setAuthMode('register')} />
-    ) : (
-      <Register onSwitchToLogin={() => setAuthMode('login')} />
+    return (
+      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center p-4 transition-colors duration-300">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl shadow-blue-200/50 dark:shadow-none border border-blue-100 dark:border-slate-800"
+        >
+          <div className="w-48 h-48 flex items-center justify-center mb-8 mx-auto">
+            <Logo className="w-full h-full" />
+          </div>
+          
+          {/* Tab Switcher */}
+          <div className="flex p-1 bg-blue-50 dark:bg-slate-800 rounded-2xl mb-8">
+            <button 
+              onClick={() => setAuthMode('login')}
+              className={cn(
+                "flex-1 py-2.5 text-sm font-bold rounded-xl transition-all",
+                authMode === 'login' ? "bg-white dark:bg-blue-600 text-blue-600 dark:text-white shadow-sm" : "text-blue-400 dark:text-slate-500 hover:text-blue-500"
+              )}
+            >
+              {t('auth.login')}
+            </button>
+            <button 
+              onClick={() => setAuthMode('register')}
+              className={cn(
+                "flex-1 py-2.5 text-sm font-bold rounded-xl transition-all",
+                authMode === 'register' ? "bg-white dark:bg-blue-600 text-blue-600 dark:text-white shadow-sm" : "text-blue-400 dark:text-slate-500 hover:text-blue-500"
+              )}
+            >
+              {t('auth.register')}
+            </button>
+          </div>
+
+          <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-300 dark:text-slate-600" />
+              <input 
+                type="email" 
+                placeholder={t('auth.email_placeholder')}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-12 pr-4 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-blue-900 dark:text-white placeholder:text-blue-300 dark:placeholder:text-slate-600"
+                required
+              />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-300 dark:text-slate-600" />
+              <input 
+                type="password" 
+                placeholder={t('auth.password_placeholder')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-12 pr-4 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-blue-900 dark:text-white placeholder:text-blue-300 dark:placeholder:text-slate-600"
+                required
+              />
+            </div>
+
+            {authMode === 'register' && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="space-y-4 pt-2 border-t border-blue-50 dark:border-slate-800"
+              >
+                <div className="relative">
+                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-300 dark:text-slate-600" />
+                  <input 
+                    type="text" 
+                    placeholder={t('auth.company_name')}
+                    value={regNomeEmpresa}
+                    onChange={(e) => setRegNomeEmpresa(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-blue-900 dark:text-white placeholder:text-blue-300 dark:placeholder:text-slate-600"
+                    required
+                  />
+                </div>
+                <div className="relative">
+                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-300 dark:text-slate-600" />
+                  <input 
+                    type="text" 
+                    placeholder={t('auth.owner_name')}
+                    value={regNomeResponsavel}
+                    onChange={(e) => setRegNomeResponsavel(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-blue-900 dark:text-white placeholder:text-blue-300 dark:placeholder:text-slate-600"
+                    required
+                  />
+                </div>
+                <div className="relative">
+                  <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-300 dark:text-slate-600" />
+                  <input 
+                    type="text" 
+                    placeholder={t('auth.cnpj')}
+                    value={regCnpjEmpresa}
+                    onChange={(e) => setRegCnpjEmpresa(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-blue-900 dark:text-white placeholder:text-blue-300 dark:placeholder:text-slate-600"
+                    required
+                  />
+                </div>
+                <div className="relative">
+                  <MessageSquare className="absolute left-4 top-4 w-5 h-5 text-blue-300 dark:text-slate-600" />
+                  <textarea 
+                    placeholder={t('auth.company_desc')}
+                    value={regDescricaoEmpresa}
+                    onChange={(e) => setRegDescricaoEmpresa(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-blue-900 dark:text-white placeholder:text-blue-300 dark:placeholder:text-slate-600 min-h-[100px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-blue-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2">Nicho do Negócio</label>
+                  <NicheSelector 
+                    value={regNicho}
+                    onChange={setRegNicho}
+                    placeholder="Selecionar Nicho do Negócio"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-blue-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2">{t('auth.phone_label')}</label>
+                  <div className="phone-input-container">
+                    <PhoneInput
+                      placeholder={t('auth.phone_label')}
+                      value={regTelefone}
+                      onChange={setRegTelefone}
+                      defaultCountry="BR"
+                      labels={countryLabels}
+                      flagComponent={FlagComponent}
+                      className="w-full px-4 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus-within:ring-2 focus-within:ring-blue-500 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all text-blue-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+            
+            {authError && (
+              <div className="space-y-4 px-2">
+                <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl">
+                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-600 dark:text-red-400 font-medium">{authError}</p>
+                </div>
+                
+                {showSetupHelper && (
+                  <div className="p-5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-[24px] shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Key className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">{t('auth.setup_helper_title')}</p>
+                    </div>
+                    
+                    <ol className="text-xs text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-3 mb-4">
+                      <li>{t('auth.setup_helper_step1')}</li>
+                      <li>{t('auth.setup_helper_step2')}</li>
+                      <li>{t('auth.setup_helper_step3')}</li>
+                      <li>{t('auth.setup_helper_step4')}</li>
+                    </ol>
+
+                    <button 
+                      onClick={() => {
+                        setAuthError("");
+                        setShowSetupHelper(false);
+                      }}
+                      className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all active:scale-95"
+                    >
+                      {t('auth.setup_helper_retry')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20"
+            >
+              {authMode === 'login' ? t('auth.action_login') : t('auth.action_register')}
+            </button>
+          </form>
+
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-blue-100"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-blue-300 font-bold">{t('auth.or_continue_with')}</span>
+            </div>
+          </div>
+
+          <button 
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 py-4 bg-white border border-blue-100 text-blue-900 rounded-2xl font-semibold hover:bg-blue-50 transition-all active:scale-[0.98]"
+          >
+            <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" className="w-5 h-5" alt="Google" />
+            Google
+          </button>
+        </motion.div>
+      </div>
     );
   }
 
@@ -597,7 +951,7 @@ export default function App() {
     isUpgrading
   );
 
-  const isProfileIncomplete = profile && !profile.nomeEmpresa;
+  const isProfileIncomplete = profile && profile.hasSelectedPlan && !profile.nomeEmpresa;
 
   if (shouldShowSubscriptions) {
     return (
@@ -630,7 +984,10 @@ export default function App() {
         onComplete={async (data) => {
           if (!user || !profile) return;
           try {
-            await updateProfile(data);
+            const profileRef = doc(db, 'users', user.uid);
+            const updatedProfile = { ...profile, ...data };
+            await setDoc(profileRef, updatedProfile, { merge: true });
+            setProfile(updatedProfile);
           } catch (error) {
             handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
           }
@@ -668,7 +1025,7 @@ export default function App() {
                 {t('trial.get_plans')}
               </button>
               <button 
-                onClick={handleLogout}
+                onClick={() => signOut(auth)}
                 className="mt-6 text-sm font-medium text-slate-400 hover:text-blue-600 transition-colors"
               >
                 {t('nav.logout')}
@@ -831,8 +1188,6 @@ export default function App() {
             
             <div className="flex-1 max-w-xl mx-auto md:mx-0 flex items-center gap-2">
               <GlobalSearch 
-                isOpen={isSearchOpen}
-                onClose={() => setIsSearchOpen(false)}
                 transactions={transactions} 
                 products={products} 
                 people={people} 
@@ -890,7 +1245,7 @@ export default function App() {
               ) : (
                 <>
                   {/* Dashboard */}
-                  {authLoading ? (
+                  {loading ? (
                     <DashboardSkeleton />
                   ) : (
                     <Dashboard 

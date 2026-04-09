@@ -155,11 +155,11 @@ export const ProfileSetup = ({ profile, onComplete, onBack }: ProfileSetupProps)
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-blue-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2">{t('auth.business_niche')}</label>
+              <label className="text-[10px] font-bold text-blue-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2">Nicho do Negócio</label>
               <NicheSelector 
                 value={formData.nicho}
                 onChange={(val) => setFormData({ ...formData, nicho: val })}
-                placeholder={t('auth.business_niche')}
+                placeholder="Selecionar Nicho do Negócio"
               />
             </div>
             <div className="space-y-2">

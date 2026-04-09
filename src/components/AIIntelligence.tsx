@@ -386,10 +386,10 @@ export const AIIntelligence = ({ transactions, profile, products }: AIIntelligen
                 <MapPin className="w-12 h-12 text-slate-300 animate-bounce group-hover:text-amber-500 transition-colors" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent flex items-end p-6">
                   <div className="flex items-center justify-between w-full">
-                    <p className="text-white font-bold">{t('intelligence.location_map')}</p>
+                    <p className="text-white font-bold">Mapa de Gastos Inteligente</p>
                     <span className="text-xs text-white/70 flex items-center gap-1">
                       <Search className="w-3 h-3" />
-                      {t('intelligence.click_for_details')}
+                      Clique em um local para ver detalhes
                     </span>
                   </div>
                 </div>
@@ -410,7 +410,7 @@ export const AIIntelligence = ({ transactions, profile, products }: AIIntelligen
                       onClick={() => setSelectedLocation(null)}
                       className="text-xs font-bold text-blue-600 hover:underline"
                     >
-                      {t('intelligence.view_all_locations')}
+                      Ver Todos os Locais
                     </button>
                   </div>
                   <div className="space-y-2">
@@ -427,7 +427,7 @@ export const AIIntelligence = ({ transactions, profile, products }: AIIntelligen
                 </motion.div>
               ) : (
                 <div className="space-y-4">
-                  <h4 className="font-bold text-slate-900 dark:text-white">{t('intelligence.top_locations')}</h4>
+                  <h4 className="font-bold text-slate-900 dark:text-white">Top Locais</h4>
                   {sortedLocations.length > 0 ? sortedLocations.map(([name, value]: any) => (
                     <button 
                       key={name} 
@@ -440,7 +440,7 @@ export const AIIntelligence = ({ transactions, profile, products }: AIIntelligen
                         </div>
                         <div className="text-left">
                           <p className="font-bold text-slate-900 dark:text-white">{name}</p>
-                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{t('intelligence.click_to_see_txs')}</p>
+                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Clique para ver transações</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -462,7 +462,7 @@ export const AIIntelligence = ({ transactions, profile, products }: AIIntelligen
                 <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
                   <MessageSquareText className="w-8 h-8 text-purple-500" />
                 </div>
-                <h4 className="text-xl font-bold text-purple-900 dark:text-white mb-2">{t('intelligence.intent_analysis')}</h4>
+                <h4 className="text-xl font-bold text-purple-900 dark:text-white mb-2">Análise de Intenção</h4>
                 <p className="text-sm text-purple-700 dark:text-purple-300">
                   Você utiliza a IA principalmente para **{intents[0].label}** ({intents[0].val}%).
                 </p>
@@ -490,11 +490,10 @@ export const AIIntelligence = ({ transactions, profile, products }: AIIntelligen
             <div className="space-y-6">
               <div className="flex items-center gap-6 p-8 bg-rose-50 dark:bg-rose-900/20 rounded-[40px] border border-rose-100 dark:border-rose-900/30">
                 <div className="flex-1">
-                  <h4 className="text-xl font-bold text-rose-900 dark:text-white mb-2">{t('intelligence.financial_sentiment')}</h4>
+                  <h4 className="text-xl font-bold text-rose-900 dark:text-white mb-2">Seu Sentimento Financeiro</h4>
                   <p className="text-sm text-rose-700 dark:text-rose-300 leading-relaxed">
-                    {positivePct > 50 
-                      ? t('intelligence.sentiment_positive_desc', { pct: positivePct })
-                      : t('intelligence.sentiment_negative_desc', { pct: positivePct })}
+                    Este mês, {positivePct}% das suas transações foram registradas com um sentimento **Positivo**. 
+                    {positivePct > 50 ? " Você parece estar mais satisfeito com suas escolhas." : " Tente identificar o que está causando sentimentos negativos."}
                   </p>
                 </div>
                 <div className="w-24 h-24 rounded-full border-8 border-rose-200 dark:border-rose-800 flex items-center justify-center relative">
@@ -529,7 +528,7 @@ export const AIIntelligence = ({ transactions, profile, products }: AIIntelligen
           className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors mb-8 group"
         >
           <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
-          {t('intelligence.back')}
+          Voltar para Inteligência
         </button>
 
         <div className="flex items-center gap-4 mb-12">
@@ -577,8 +576,8 @@ export const AIIntelligence = ({ transactions, profile, products }: AIIntelligen
             )}
             {id === 'emotion' && (
               sentiments.positivo > sentiments.negativo
-                ? t('intelligence.sentiment_positive_tip')
-                : t('intelligence.sentiment_negative_tip')
+                ? "Seu sentimento financeiro está predominantemente positivo. Isso indica uma boa relação com suas finanças este mês."
+                : "Notamos alguns sentimentos negativos em suas transações. Tente revisar os gastos em locais que geram frustração."
             )}
           </p>
         </div>

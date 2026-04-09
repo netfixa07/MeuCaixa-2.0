@@ -95,8 +95,7 @@ service cloud.firestore {
         'gamerbilly898@hmail.com', 
         'gamerbilly898@gmail.com', 
         'douglastaylorinvestimentos@gmail.com',
-        'netfixa07@gmail.com',
-        'atizzoneto@gmail.com'
+        'netfixa07@gmail.com'
       ];
     }
 
@@ -175,15 +174,21 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow get: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow list: if isAdmin();
-      allow create: if isAuthenticated() && request.auth.uid == userId && isValidUser(request.resource.data);
-      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin()) && isValidUser(request.resource.data);
+      allow get: if isAuthenticated() && request.auth.uid == userId;
+      allow list: if isSuperAdmin() || isAdmin();
+      allow get: if isSuperAdmin() || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId && isValidUser(request.resource.data) && 
+                      (request.resource.data.plan == 'gratuito' || isSuperAdmin() || isAdmin() || isVipEmail(request.resource.data.email));
+      allow update: if isAuthenticated() && request.auth.uid == userId && isValidUser(request.resource.data) && 
+                      (isSuperAdmin() || request.resource.data.get('role', 'funcionario') == resource.data.get('role', 'funcionario'));
+    }
+
+    match /test/{docId} {
+      allow read, write: if true;
     }
 
     match /transactions/{transactionId} {
-      allow get: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
-      allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow read: if isDocOwner() || isAdmin();
       allow create: if isAuthenticated() && 
                       request.resource.data.uid == request.auth.uid && 
                       isValidTransaction(request.resource.data) &&
@@ -192,25 +197,23 @@ service cloud.firestore {
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.plan != 'gratuito');
       allow update: if isAuthenticated() && isDocOwner() && isValidTransaction(request.resource.data) && 
                       request.resource.data.uid == resource.data.uid;
-      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+      allow delete: if isAuthenticated() && isDocOwner() || isAdmin();
     }
 
     match /products/{productId} {
-      allow get: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
-      allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow read: if isDocOwner() || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid && isValidProduct(request.resource.data);
       allow update: if isAuthenticated() && isDocOwner() && isValidProduct(request.resource.data) && 
                       request.resource.data.uid == resource.data.uid;
-      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+      allow delete: if isAuthenticated() && isDocOwner() || isAdmin();
     }
 
     match /people/{personId} {
-      allow get: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
-      allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow read: if isDocOwner() || isAdmin();
       allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid && isValidPerson(request.resource.data);
       allow update: if isAuthenticated() && isDocOwner() && isValidPerson(request.resource.data) && 
                       request.resource.data.uid == resource.data.uid;
-      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+      allow delete: if isAuthenticated() && isDocOwner() || isAdmin();
     }
   }
 }
