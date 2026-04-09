@@ -143,6 +143,7 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [showSetupHelper, setShowSetupHelper] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -211,8 +212,12 @@ export default function App() {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
       } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
+        if (error instanceof Error) {
+          if (error.message.includes('the client is offline')) {
+            console.error("Please check your Firebase configuration. The client is offline.");
+          } else {
+            console.error("Firebase connection test failed:", error.message);
+          }
         }
       }
     }
@@ -364,6 +369,8 @@ export default function App() {
   }, [transactions]);
 
   const handleGoogleLogin = useCallback(async () => {
+    if (isAuthLoading) return;
+    setIsAuthLoading(true);
     try {
       setAuthError("");
       setShowSetupHelper(false);
@@ -375,17 +382,26 @@ export default function App() {
         setShowSetupHelper(true);
       } else if (error.code === 'auth/popup-closed-by-user') {
         setAuthError(""); // User closed popup, no need for error message
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setAuthError("Este domínio não está autorizado no Firebase. Adicione-o em Authentication > Settings > Authorized domains.");
       } else {
         setAuthError("Falha ao entrar com Google.");
       }
+    } finally {
+      setIsAuthLoading(false);
     }
-  }, []);
+  }, [isAuthLoading]);
 
   const handleEmailAuth = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAuthLoading) return;
+    setIsAuthLoading(true);
     setAuthError("");
     setShowSetupHelper(false);
-    if (!email || !password) return;
+    if (!email || !password) {
+      setIsAuthLoading(false);
+      return;
+    }
 
     try {
       if (authMode === 'login') {
@@ -429,13 +445,17 @@ export default function App() {
       } else if (error.code === 'auth/operation-not-allowed') {
         setAuthError(t('auth.error_not_allowed'));
         setShowSetupHelper(true);
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setAuthError("Este domínio não está autorizado no Firebase.");
       } else if (error.code === 'permission-denied') {
         handleFirestoreError(error, OperationType.CREATE, 'users');
       } else {
         setAuthError(error.message || "Ocorreu um erro na autenticação.");
       }
+    } finally {
+      setIsAuthLoading(false);
     }
-  }, [authMode, email, password, regNomeEmpresa, regNomeResponsavel, regCnpjEmpresa, regDescricaoEmpresa, regTelefone]);
+  }, [authMode, email, password, regNomeEmpresa, regNomeResponsavel, regCnpjEmpresa, regDescricaoEmpresa, regTelefone, isAuthLoading]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -824,8 +844,10 @@ export default function App() {
 
             <button 
               type="submit"
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20"
+              disabled={isAuthLoading}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
+              {isAuthLoading && <Loader2 className="w-5 h-5 animate-spin" />}
               {authMode === 'login' ? t('auth.action_login') : t('auth.action_register')}
             </button>
           </form>
@@ -841,9 +863,14 @@ export default function App() {
 
           <button 
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 py-4 bg-white border border-blue-100 text-blue-900 rounded-2xl font-semibold hover:bg-blue-50 transition-all active:scale-[0.98]"
+            disabled={isAuthLoading}
+            className="w-full flex items-center justify-center gap-3 py-4 bg-white border border-blue-100 text-blue-900 rounded-2xl font-semibold hover:bg-blue-50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" className="w-5 h-5" alt="Google" />
+            {isAuthLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            ) : (
+              <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" className="w-5 h-5" alt="Google" />
+            )}
             Google
           </button>
         </motion.div>

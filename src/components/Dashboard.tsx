@@ -268,7 +268,7 @@ export const Dashboard = ({ transactions, profile, products = [], people = [], o
               <LineChartIcon className="w-4 h-4 text-blue-500" />
               {t('dashboard.cash_flow_forecast')}
             </h3>
-            <div className="h-48">
+            <div className="h-48 min-h-[192px] relative">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={cashFlowForecast}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -310,7 +310,7 @@ export const Dashboard = ({ transactions, profile, products = [], people = [], o
             <PieChartIcon className="w-4 h-4 text-blue-400" />
             {t('dashboard.expense_distribution')}
           </h3>
-          <div className="h-64">
+          <div className="h-64 min-h-[256px] relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -346,7 +346,7 @@ export const Dashboard = ({ transactions, profile, products = [], people = [], o
             <BarChart3 className="w-4 h-4 text-blue-400" />
             {t('dashboard.revenue_niches')}
           </h3>
-          <div className="h-64">
+          <div className="h-64 min-h-[256px] relative">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData.incomeData}>
                 <XAxis dataKey="name" hide />
