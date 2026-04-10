@@ -16,8 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Inicializa o Firestore usando o ID do banco de dados da configuração.
-const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId;
+const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId || '(default)';
 export const db = getFirestore(app, databaseId);
 
 export const googleProvider = new GoogleAuthProvider();

@@ -10,7 +10,11 @@ import {
   onAuthStateChanged, 
   User,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 import { 
   collection, 
@@ -41,6 +45,8 @@ import {
   ArrowLeft,
   Mail,
   Lock,
+  Eye,
+  EyeOff,
   User as UserIcon,
   CheckCircle2,
   Zap,
@@ -143,6 +149,8 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [showSetupHelper, setShowSetupHelper] = useState(false);
   const [newEmail, setNewEmail] = useState("");
@@ -236,16 +244,19 @@ export default function App() {
       
       try {
         if (currentUser) {
+          console.log("User logged in, fetching profile for:", currentUser.uid);
           const profileRef = doc(db, 'users', currentUser.uid);
           let profileSnap;
           try {
             profileSnap = await getDoc(profileRef);
           } catch (error) {
+            console.error("Error fetching profile:", error);
             handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
             throw error;
           }
 
           if (profileSnap.exists()) {
+            console.log("Profile found:", profileSnap.data());
             const data = profileSnap.data() as UserProfile;
             let currentPlan = data.plan;
             let hasSelectedPlan = data.hasSelectedPlan ?? false;
@@ -392,6 +403,19 @@ export default function App() {
     }
   }, [isAuthLoading]);
 
+  const handleForgotPassword = useCallback(async () => {
+    if (!email) {
+      setAuthError("Digite seu e-mail para recuperar a senha.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success("E-mail de recuperação enviado!");
+    } catch (error: any) {
+      setAuthError("Erro ao enviar e-mail de recuperação.");
+    }
+  }, [email]);
+
   const handleEmailAuth = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (isAuthLoading) return;
@@ -404,11 +428,19 @@ export default function App() {
     }
 
     try {
+      console.log("Starting auth process:", { authMode, email });
+      // Set persistence
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
       if (authMode === 'login') {
+        console.log("Attempting login...");
         await signInWithEmailAndPassword(auth, email, password);
+        console.log("Login successful");
       } else {
+        console.log("Attempting registration...");
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const newUser = userCredential.user;
+        console.log("User created:", newUser.uid);
         
         // Create profile with additional fields
         const vipEmails = ['gamerbilly898@hmail.com', 'gamerbilly898@gmail.com', 'douglastaylorinvestimentos@gmail.com', 'netfixa07@gmail.com'];
@@ -431,15 +463,20 @@ export default function App() {
             createdAt: now,
             lastLogin: now
           };
+        console.log("Saving profile to Firestore...");
         await setDoc(profileRef, newProfile);
+        console.log("Profile saved successfully");
         setProfile(newProfile);
       }
     } catch (error: any) {
-      console.error("Auth failed:", error);
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      console.error("Auth failed detailed error:", error);
+      if (error.code === 'auth/api-key-not-valid') {
+        setAuthError("Erro de configuração: Chave de API do Firebase inválida. Por favor, contate o suporte.");
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         setAuthError(t('auth.error_invalid'));
       } else if (error.code === 'auth/email-already-in-use') {
         setAuthError(t('auth.error_email_in_use'));
+        // Automatically suggest switching to login
       } else if (error.code === 'auth/weak-password') {
         setAuthError(t('auth.error_weak_password'));
       } else if (error.code === 'auth/operation-not-allowed') {
@@ -448,14 +485,17 @@ export default function App() {
       } else if (error.code === 'auth/unauthorized-domain') {
         setAuthError("Este domínio não está autorizado no Firebase.");
       } else if (error.code === 'permission-denied') {
-        handleFirestoreError(error, OperationType.CREATE, 'users');
+        setAuthError("Erro de permissão no banco de dados. Por favor, tente novamente mais tarde.");
+        try {
+          handleFirestoreError(error, OperationType.CREATE, 'users');
+        } catch (e) { /* ignore rethrow */ }
       } else {
         setAuthError(error.message || "Ocorreu um erro na autenticação.");
       }
     } finally {
       setIsAuthLoading(false);
     }
-  }, [authMode, email, password, regNomeEmpresa, regNomeResponsavel, regCnpjEmpresa, regDescricaoEmpresa, regTelefone, isAuthLoading]);
+  }, [authMode, email, password, regNomeEmpresa, regNomeResponsavel, regCnpjEmpresa, regDescricaoEmpresa, regTelefone, regNicho, isAuthLoading, t, rememberMe]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -684,9 +724,16 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-md w-full bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl shadow-blue-200/50 dark:shadow-none border border-blue-100 dark:border-slate-800"
         >
-          <div className="w-48 h-48 flex items-center justify-center mb-8 mx-auto">
+          <div className="w-32 h-32 flex items-center justify-center mb-6 mx-auto">
             <Logo className="w-full h-full" />
           </div>
+
+          <h1 className="text-2xl font-bold text-blue-900 dark:text-white text-center mb-2">
+            {authMode === 'login' ? t('auth.welcome_back') : t('auth.create_account')}
+          </h1>
+          <p className="text-sm text-blue-400 dark:text-slate-500 text-center mb-8">
+            {authMode === 'login' ? t('auth.login_subtitle') : t('auth.register_subtitle')}
+          </p>
           
           {/* Tab Switcher */}
           <div className="flex p-1 bg-blue-50 dark:bg-slate-800 rounded-2xl mb-8">
@@ -725,13 +772,43 @@ export default function App() {
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-300 dark:text-slate-600" />
               <input 
-                type="password" 
+                type={showPassword ? "text" : "password"} 
                 placeholder={t('auth.password_placeholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-4 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-blue-900 dark:text-white placeholder:text-blue-300 dark:placeholder:text-slate-600"
+                className="w-full pl-12 pr-12 py-3.5 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all text-blue-900 dark:text-white placeholder:text-blue-300 dark:placeholder:text-slate-600"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-300 dark:text-slate-600 hover:text-blue-500 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between px-2">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-blue-200 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-xs text-blue-400 dark:text-slate-500 group-hover:text-blue-500 transition-colors">
+                  {t('auth.remember_me')}
+                </span>
+              </label>
+              {authMode === 'login' && (
+                <button 
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
+                >
+                  {t('auth.forgot_password')}
+                </button>
+              )}
             </div>
 
             {authMode === 'register' && (
@@ -811,7 +888,21 @@ export default function App() {
               <div className="space-y-4 px-2">
                 <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl">
                   <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-600 dark:text-red-400 font-medium">{authError}</p>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{authError}</p>
+                    {authError === t('auth.error_email_in_use') && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('login');
+                          setAuthError("");
+                        }}
+                        className="text-xs font-bold underline text-left text-red-700 dark:text-red-300"
+                      >
+                        {t('auth.switch_to_login')}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 
                 {showSetupHelper && (
@@ -873,6 +964,15 @@ export default function App() {
             )}
             Google
           </button>
+
+          <div className="mt-8 text-center">
+            <button 
+              onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+              className="text-sm text-blue-600 dark:text-blue-400 font-bold hover:underline transition-all"
+            >
+              {authMode === 'login' ? t('auth.no_account') : t('auth.have_account')}
+            </button>
+          </div>
         </motion.div>
       </div>
     );
